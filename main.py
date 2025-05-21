@@ -70,20 +70,24 @@ def elevenlabs_tts(text: str) -> bytes:
         "xi-api-key": ELEVEN_API_KEY,
         "Content-Type": "application/json"
     }
+
+    voice_id = "ysswSXp8U9dFpzPJqFje"  # ou qualquer outro que você esteja usando
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream"
+
     payload = {
         "text": text,
+        "model_id": "eleven_turbo_v2_5",  # modelo correto, com suporte a textos maiores (~40k)
         "voice_settings": {
             "stability": 0.6,
             "similarity_boost": 0.9,
             "style": 0.15,
             "use_speaker_boost": True
-        },
-        "model_id": "eleven_turbo_v2_5",
-        "voice_id":  "ysswSXp8U9dFpzPJqFje"
+        }
     }
+
     for tentativa in range(2):
         try:
-            r = requests.post("https://api.elevenlabs.io/v1/text-to-speech/ysswSXp8U9dFpzPJqFje", headers=headers, json=payload, timeout=600)
+            r = requests.post(url, headers=headers, json=payload, timeout=600)
             r.raise_for_status()
             return r.content
         except Exception as e:
