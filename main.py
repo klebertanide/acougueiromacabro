@@ -29,7 +29,7 @@ def get_drive_service():
     )
     return build("drive", "v3", credentials=creds)
 
-def criar_subpasta(nome: str, drive, parent_folder_id: str):
+def criar_subpasta(nome: str, drive, parent_folder_: str):
     # Verificar se a pasta já existe
     try:
         results = drive.files().list(
@@ -71,7 +71,7 @@ def elevenlabs_tts(text: str) -> bytes:
         "Content-Type": "application/json"
     }
 
-    voice_id = "ysswSXp8U9dFpzPJqFje"  # ou qualquer outro que você esteja usando
+    voice_id = "V33LkP9pVLdcjeB2y5Na"  # ou qualquer outro que você esteja usando
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream"
 
     payload = {
