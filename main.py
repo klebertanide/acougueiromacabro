@@ -83,7 +83,7 @@ def elevenlabs_tts(text: str) -> bytes:
     }
     for tentativa in range(2):
         try:
-            r = requests.post("https://api.elevenlabs.io/v1/text-to-speech/ysswSXp8U9dFpzPJqFje", headers=headers, json=payload, timeout=60)
+            r = requests.post("https://api.elevenlabs.io/v1/text-to-speech/ysswSXp8U9dFpzPJqFje", headers=headers, json=payload, timeout=600)
             r.raise_for_status()
             return r.content
         except Exception as e:
