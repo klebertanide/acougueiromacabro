@@ -18,7 +18,7 @@ from googleapiclient.http import MediaFileUpload
 
 app = Flask(__name__)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-GOOGLE_DRIVE_ROOT_FOLDER = "1d6RxnsYRS52oKUPGyuAfJZ00bksUUVI2"
+GOOGLE_DRIVE_ROOT_FOLDER = "1NelNODHVBTbAuVqrfRNmLZP8MVQpF1aX"
 SERVICE_ACCOUNT_FILE     = "/etc/secrets/service_account.json"
 ELEVEN_API_KEY           = os.getenv("ELEVENLABS_API_KEY")
 
@@ -79,11 +79,11 @@ def elevenlabs_tts(text: str) -> bytes:
             "use_speaker_boost": True
         },
         "model_id": "eleven_multilingual_v2",
-        "voice_id":  "cwIsrQsWEVTols6slKYN"
+        "voice_id":  "ysswSXp8U9dFpzPJqFje"
     }
     for tentativa in range(2):
         try:
-            r = requests.post("https://api.elevenlabs.io/v1/text-to-speech/cwIsrQsWEVTols6slKYN", headers=headers, json=payload, timeout=60)
+            r = requests.post("https://api.elevenlabs.io/v1/text-to-speech/ysswSXp8U9dFpzPJqFje", headers=headers, json=payload, timeout=60)
             r.raise_for_status()
             return r.content
         except Exception as e:
@@ -230,7 +230,7 @@ def gerar_csv():
             ])
             
             # Valores padrão para as colunas fixas
-            negative_prompt = "words, sentences, texts, paragraphs, letters, numbers, syllables, low quality, overexposed, underexposed, extra limbs, extra fingers, missing fingers, disfigured, deformed, bad anatomy, realistic style, photographic style, 3d, 3d render"
+            negative_prompt = "words, sentences, texts, paragraphs, letters, numbers, syllables, low quality, ofingers"
             
             # Calcular a duração total do áudio
             duracao_total = max([bloco["fim"] for bloco in transcricao]) if transcricao else 0
@@ -261,11 +261,11 @@ def gerar_csv():
                 tempo_inicio = f"{tempo}"
                 
                 # Construir o prompt completo: tempo + prompt + informações de aquarela
-                prompt_completo = f"{tempo_inicio}, {prompt_texto}, Delicate 2d watercolor painting with expressive brush strokes and visible paper texture. Color palette blending soft pastels with bold hues. Artistic composition that evokes emotion and depth, featuring flowing pigments, subtle gradients, and organic imperfections. Emphasize the handcrafted feel, with layered translucency and a poetic atmosphere."
+                prompt_completo = f"{tempo_inicio}, {prompt_texto}, Images that look like sketches made by a sick maniac, macabre scribbles, fear, dread, terror, panic, phobia, fright, frightening, terrifying, frightening. cruelty, monstrosity, barbarity, atrocity, hideousness, savagery, inhumanity, bestiality, macabreness, misfortune, unhappiness, sadness, dissatisfaction, displeasure, displeasure, setback, difficulty, misfortune, misfortune, misfortune"
                 
                 # Escrever a linha com todos os valores conforme o modelo
                 writer.writerow([
-                    prompt_completo,  # Prompt completo com tempo, texto e aquarela
+                    prompt_completo,  # Prompt completo com tempo, texto 
                     "private",        # Visibility
                     aspect_ratio,     # Aspect_ratio (9:16 por padrão)
                     "on",             # Magic_prompt
