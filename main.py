@@ -78,7 +78,7 @@ def elevenlabs_tts(text: str) -> bytes:
             "style": 0.15,
             "use_speaker_boost": True
         },
-        "model_id": "turbo_v2_5",
+        "model_id": "eleven_turbo_v2_5",
         "voice_id":  "ysswSXp8U9dFpzPJqFje"
     }
     for tentativa in range(2):
