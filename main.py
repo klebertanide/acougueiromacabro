@@ -29,8 +29,7 @@ def get_drive_service():
     )
     return build("drive", "v3", credentials=creds)
 
-def criar_subpasta(nome: str, drive, parent_folder_: str):
-    # Verificar se a pasta já existe
+def criar_subpasta(nome: str, drive, parent_folder_id: str):
     try:
         results = drive.files().list(
             q=f"name='{nome}' and mimeType='application/vnd.google-apps.folder' and '{parent_folder_id}' in parents",
@@ -42,9 +41,8 @@ def criar_subpasta(nome: str, drive, parent_folder_: str):
         if items:
             return items[0]['id']
     except Exception:
-        pass  # Se falhar, continua e cria uma nova pasta
+        pass
     
-    # Criar nova pasta
     meta = {
         "name": nome,
         "mimeType": "application/vnd.google-apps.folder",
@@ -78,9 +76,9 @@ def elevenlabs_tts(text: str) -> bytes:
         "text": text,
         "model_id": "eleven_turbo_v2_5",  # modelo correto, com suporte a textos maiores (~40k)
         "voice_settings": {
-            "stability": 0.6,
+            "stability": 0.8,
             "similarity_boost": 0.9,
-            "style": 0.15,
+            "style": 0.10,
             "use_speaker_boost": True
         }
     }
