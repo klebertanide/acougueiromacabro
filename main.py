@@ -88,14 +88,14 @@ def elevenlabs_tts(text: str) -> bytes:
         "Content-Type": "application/json"
     }
 
-    voice_id = "V33LkP9pVLdcjeB2y5Na"
+    voice_id = "NgBYGKDDq2Z8Hnhatgma"
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream"
 
     payload = {
         "text": text,
         "model_id": "eleven_turbo_v2_5",
         "voice_settings": {
-            "stability": 0.8,
+            "stability": 0.9,
             "similarity_boost": 0.9,
             "style": 0.10,
             "use_speaker_boost": True
