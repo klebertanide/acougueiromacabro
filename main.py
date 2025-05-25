@@ -22,6 +22,25 @@ GOOGLE_DRIVE_ROOT_FOLDER = "1NelNODHVBTbAuVqrfRNmLZP8MVQpF1aX"
 SERVICE_ACCOUNT_FILE     = "/etc/secrets/service_account.json"
 ELEVEN_API_KEY           = os.getenv("ELEVENLABS_API_KEY")
 
+DEFAULT_CSV_HEADER = [
+    "Prompt", "Visibility", "Aspect_ratio", "Magic_prompt", "Model",
+    "Seed_number", "Rendering", "Negative_prompt", "Style", "color_palette", "Num_images"
+]
+
+DEFAULT_CSV_ROW = lambda prompt: [
+    prompt,
+    "private",
+    "9:16",
+    "on",
+    "3",
+    "",
+    "turbo",
+    "sem palavras, sem frases, sem textos, palavras, textos, frases, words, sentences, texts, paragraphs, letters, captions, watermark, logos",
+    "auto",
+    "",
+    "4"
+]
+
 def get_drive_service():
     creds = service_account.Credentials.from_service_account_file(
         SERVICE_ACCOUNT_FILE,
@@ -36,7 +55,7 @@ def criar_subpasta(nome: str, drive, parent_folder_id: str):
             spaces='drive',
             fields='files(id, name)'
         ).execute()
-        
+
         items = results.get('files', [])
         if items:
             return items[0]['id']
@@ -115,11 +134,13 @@ def gerar_prompts_dobrados_do_srt(srt_content: str):
     prompts = []
     for i in range(len(blocks)):
         t1, txt1 = blocks[i]
-        prompts.append((t1, f"Prompt visual representando: {txt1}"))
+        descricao = f"{t1}, {txt1}, horror atmosphere, low lighting, unsettling shadows, digital artifacts, surreal digital painting, cold color palette, glitch aesthetic, paranoia, liminal space, grain, creepy. Nunca inserir texto, frases ou palavras."
+        prompts.append((t1, descricao))
         if i < len(blocks) - 1:
             t2, _ = blocks[i + 1]
             meio = (t1 + t2) // 2
-            prompts.append((meio, f"Prompt visual intermediário entre tópicos: {txt1}"))
+            descricao_intermediaria = f"{meio}, {txt1}, horror atmosphere, low lighting, unsettling shadows, digital artifacts, surreal digital painting, cold color palette, glitch aesthetic, paranoia, liminal space, grain, creepy. Nunca inserir texto, frases ou palavras."
+            prompts.append((meio, descricao_intermediaria))
 
     return prompts
 
@@ -166,20 +187,28 @@ def transcrever():
         with open(srt_path, "w", encoding="utf-8") as f:
             f.write(raw_srt)
 
-        try:
-            drive = get_drive_service()
-            folder_id = criar_subpasta(slug, drive, GOOGLE_DRIVE_ROOT_FOLDER)
-            upload_para_drive(srt_path, srt_path.name, folder_id, drive)
-        except Exception as e:
-            print(f"Erro ao fazer upload do SRT: {e}")
+        drive = get_drive_service()
+        folder_id = criar_subpasta(slug, drive, GOOGLE_DRIVE_ROOT_FOLDER)
+        upload_para_drive(srt_path, srt_path.name, folder_id, drive)
 
         prompts_gerados = gerar_prompts_dobrados_do_srt(raw_srt)
+
+        # Gerar CSV
+        csv_path = Path(f"{slug}_prompts.csv")
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(DEFAULT_CSV_HEADER)
+            for _, prompt in prompts_gerados:
+                writer.writerow(DEFAULT_CSV_ROW(prompt))
+
+        upload_para_drive(csv_path, csv_path.name, folder_id, drive)
 
         return jsonify(
             transcricao=[{"inicio": i, "fim": f, "texto": t} for i, f, t in blocks],
             duracao_total=total,
             slug=slug,
-            prompts=prompts_gerados
+            prompts=prompts_gerados,
+            folder_url=f"https://drive.google.com/drive/folders/{folder_id}"
         )
     except Exception as e:
         return jsonify(error="falha na transcrição", detalhe=str(e)), 500
