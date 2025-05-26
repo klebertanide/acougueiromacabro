@@ -128,8 +128,6 @@ def parse_ts(ts: str) -> float:
     s, ms = rest.split(",")
     return int(h)*3600 + int(m)*60 + int(s) + int(ms)/1000
 
-
-
 def gerar_prompts_via_chatgpt(srt_content: str, modelo="gpt-4"):
     def parse_srt(srt: str):
         blocks = []
@@ -180,8 +178,6 @@ def gerar_prompts_via_chatgpt(srt_content: str, modelo="gpt-4"):
         time.sleep(1.5)  # para evitar throttling
 
     return resultados
-
-
 
 @app.route("/falar", methods=["POST"])
 def falar():
