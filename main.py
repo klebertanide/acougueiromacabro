@@ -47,7 +47,7 @@ def get_drive_service():
         SERVICE_ACCOUNT_FILE,
         scopes=["https://www.googleapis.com/auth/drive"]
     )
-    return build("drive", "v3", credentials=creds)
+    return build("drive", "v3", credentials=creds, cache_discovery=False)
 
 def criar_subpasta(nome: str, drive, parent_folder_id: str):
     try:
@@ -60,18 +60,22 @@ def criar_subpasta(nome: str, drive, parent_folder_id: str):
         items = results.get('files', [])
         if items:
             return items[0]['id']
-    except Exception:
-        pass
+    except Exception as e:
+        print("Erro ao buscar subpasta:", e)
 
-    meta = {
-        "name": nome,
-        "mimeType": "application/vnd.google-apps.folder",
-        "parents": [parent_folder_id]
-    }
-    return drive.files().create(body=meta).execute()["id"]
+    try:
+        meta = {
+            "name": nome,
+            "mimeType": "application/vnd.google-apps.folder",
+            "parents": [parent_folder_id]
+        }
+        return drive.files().create(body=meta).execute()["id"]
+    except Exception as e:
+        print("Erro ao criar subpasta:", e)
+        raise RuntimeError("Falha ao criar subpasta no Google Drive.")
 
 def upload_para_drive(path: Path, nome: str, folder_id: str, drive):
-    media = MediaFileUpload(str(path), resumable=True)
+    media = MediaFileUpload(str(path))  # mantém resumable padrão
     drive.files().create(body={"name": nome, "parents": [folder_id]}, media_body=media).execute()
 
 def gerar_slug():
@@ -85,7 +89,7 @@ def slugify(text: str, limit: int = 30) -> str:
 
 def elevenlabs_tts(text: str) -> str:
     if not ELEVEN_API_KEY:
-        raise RuntimeError("VariÃ¡vel ELEVEN_API_KEY nÃ£o definida")
+        raise RuntimeError("Variável ELEVEN_API_KEY não definida")
 
     headers = {
         "xi-api-key": ELEVEN_API_KEY,
@@ -155,7 +159,7 @@ def transcrever():
     slug = data.get("slug")
 
     if not audio_ref:
-        return jsonify(error="campo 'audio_url' ou 'audio_file' obrigatÃ³rio"), 400
+        return jsonify(error="campo 'audio_url' ou 'audio_file' obrigatório"), 400
 
     if not slug:
         slug = Path(audio_ref).stem
@@ -171,7 +175,7 @@ def transcrever():
             fobj = io.BytesIO(resp.content)
             fobj.name = Path(audio_ref).name or "audio.mp3"
     except Exception as e:
-        return jsonify(error="falha ao carregar Ã¡udio", detalhe=str(e)), 400
+        return jsonify(error="falha ao carregar áudio", detalhe=str(e)), 400
 
     try:
         raw_srt = client.audio.transcriptions.create(model="whisper-1", file=fobj, response_format="srt")
@@ -214,7 +218,7 @@ def transcrever():
             folder_url=f"https://drive.google.com/drive/folders/{folder_id}"
         )
     except Exception as e:
-        return jsonify(error="falha na transcriÃ§Ã£o", detalhe=str(e)), 500
+        return jsonify(error="falha na transcrição", detalhe=str(e)), 500
     finally:
         try: fobj.close()
         except: pass
@@ -227,7 +231,7 @@ def falar():
         texto = data.get("texto")
 
         if not texto:
-            return jsonify(error="Campo 'texto' Ã© obrigatÃ³rio"), 400
+            return jsonify(error="Campo 'texto' é obrigatório"), 400
 
         slug = slugify(texto[:40])
         audio_path_str = elevenlabs_tts(texto)
@@ -253,7 +257,7 @@ def falar():
 
 @app.route("/", methods=["GET"])
 def index():
-    return "Servidor do AÃ§ougueiro Macabro estÃ¡ online e rodando."
+    return "Servidor do Açougueiro Macabro está online e rodando."
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
