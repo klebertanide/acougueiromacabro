@@ -176,6 +176,47 @@ def gerar_prompts_via_chatgpt(srt_content: str, modelo="gpt-4"):
 
     return resultados
 
+@app.route("/falar", methods=["POST"])
+def falar():
+    try:
+        data = request.get_json()
+        texto = data.get("texto")
+        if not texto:
+            return jsonify({"erro": "Campo 'texto' obrigatório."}), 400
+
+        slug = slugify(texto)
+        audio_path = elevenlabs_tts(texto, slug)
+        
+        # Simula transcrição e prompts
+        transcricao_fake = [
+            {"inicio": 0.0, "fim": 3.0, "texto": texto}
+        ]
+        srt_simulado = "1\n00:00:00,000 --> 00:00:03,000\n" + texto
+        prompts = gerar_prompts_via_chatgpt(srt_simulado)
+
+        drive = get_drive_service()
+        folder_id = criar_subpasta(slug, drive, GOOGLE_DRIVE_ROOT_FOLDER)
+
+        upload_para_drive(Path(audio_path), f"{slug}_audio.mp3", folder_id, drive)
+
+        folder_url = f"https://drive.google.com/drive/folders/{folder_id}"
+
+        return jsonify({
+            "slug": slug,
+            "duracao_total": 3.0,
+            "folder_url": folder_url,
+            "transcricao": transcricao_fake,
+            "prompts": prompts
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            "erro": str(e),
+            "trace": traceback.format_exc()
+        }), 500
+
+
 @app.route("/", methods=["GET"])
 def index():
     return "Servidor do Açougueiro Macabro está online e rodando."
