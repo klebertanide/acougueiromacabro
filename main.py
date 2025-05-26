@@ -57,7 +57,6 @@ def criar_subpasta(nome: str, drive, parent_folder_id: str):
             spaces='drive',
             fields='files(id, name)'
         ).execute()
-
         items = results.get('files', [])
         if items:
             return items[0]['id']
@@ -175,72 +174,9 @@ def gerar_prompts_via_chatgpt(srt_content: str, modelo="gpt-4"):
             print(f"Erro no tempo {tempo}: {e}")
             resultados.append((tempo, f"{tempo}, ERRO AO GERAR PROMPT"))
 
-        time.sleep(1.5)  # para evitar throttling
+        time.sleep(1.5)
 
     return resultados
-
-@app.route("/falar", methods=["POST"])
-def falar():
-    import traceback
-    try:
-        data = request.get_json(force=True)
-        texto = data.get("texto")
-
-        if not texto:
-            return jsonify(error="Campo 'texto' é obrigatório"), 400
-
-        slug = slugify(texto[:40])
-        audio_path_str = elevenlabs_tts(texto, slug)
-        audio_path = Path(audio_path_str)
-
-        drive = get_drive_service()
-        folder_id = criar_subpasta(slug, drive, GOOGLE_DRIVE_ROOT_FOLDER)
-        upload_para_drive(audio_path, audio_path.name, folder_id, drive)
-
-        with open(audio_path, "rb") as fobj:
-            raw_srt = client.audio.transcriptions.create(model="whisper-1", file=fobj, response_format="srt")
-
-        blocks = []
-        for blk in raw_srt.strip().split("\n\n"):
-            parts = blk.split("\n")
-            if len(parts) < 3:
-                continue
-            st, en = parts[1].split(" --> ")
-            txt = " ".join(parts[2:])
-            inicio = parse_ts(st)
-            fim = parse_ts(en)
-            blocks.append((inicio, fim, txt))
-        total = blocks[-1][1] if blocks else 0
-
-        srt_path = Path(f"{slug}_legenda.srt")
-        with open(srt_path, "w", encoding="utf-8") as f:
-            f.write(raw_srt)
-        upload_para_drive(srt_path, srt_path.name, folder_id, drive)
-
-        prompts_gerados = gerar_prompts_via_chatgpt(raw_srt)
-        csv_path = Path(f"{slug}_prompts.csv")
-        with open(csv_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(DEFAULT_CSV_HEADER)
-            for _, prompt in prompts_gerados:
-                writer.writerow(DEFAULT_CSV_ROW(prompt))
-        upload_para_drive(csv_path, csv_path.name, folder_id, drive)
-
-        return jsonify({
-            "slug": slug,
-            "duracao_total": total,
-            "folder_url": f"https://drive.google.com/drive/folders/{folder_id}",
-            "transcricao": [dict(inicio=i, fim=f, texto=t) for i, f, t in blocks],
-            "prompts": prompts_gerados
-        })
-
-    except Exception as e:
-        trace = traceback.format_exc()
-        print("ERRO NO ENDPOINT /falar:\n", trace)
-        return jsonify({
-            "erro": str(e),
-            "trace": trace
-        }), 500
 
 @app.route("/", methods=["GET"])
 def index():
