@@ -96,7 +96,7 @@ def elevenlabs_tts(text: str, slug: str) -> str:
         "Content-Type": "application/json"
     }
 
-    voice_id = "NgBYGKDDq2Z8Hnhatgma"
+    voice_id = "NgBYGKDDq2Z8Hnhatgma"  # Atlas
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream"
 
     payload = {
@@ -121,11 +121,6 @@ def elevenlabs_tts(text: str, slug: str) -> str:
             return str(mp3_path)
     except requests.RequestException as e:
         raise RuntimeError(f"Erro ao chamar ElevenLabs: {e}")
-
-def parse_ts(ts: str) -> float:
-    h, m, rest = ts.split(":")
-    s, ms = rest.split(",")
-    return int(h)*3600 + int(m)*60 + int(s) + int(ms)/1000
 
 def gerar_prompts_via_chatgpt(srt_content: str, modelo="gpt-4"):
     def parse_srt(srt: str):
@@ -177,23 +172,75 @@ def gerar_prompts_via_chatgpt(srt_content: str, modelo="gpt-4"):
         time.sleep(1.5)
 
     return resultados
-    
-@app.route("/gerar_prompts", methods=["POST"])
-def gerar_prompts_endpoint():
+
+@app.route("/gerar_audio_csv", methods=["POST"])
+def gerar_audio_csv():
     data = request.get_json()
-    srt_content = data.get("srt_content", "")
+    texto_base = data.get("texto", "")
     modelo = data.get("modelo", "gpt-4")
 
-    if not srt_content:
-        return jsonify({"error": "Conteúdo SRT ausente"}), 400
+    if not texto_base:
+        return jsonify({"error": "Texto base ausente"}), 400
 
     try:
-        prompts = gerar_prompts_via_chatgpt(srt_content, modelo)
-        slug = gerar_slug()
+        # Etapa 1: Gerar áudio
+        audio_slug = gerar_slug()
+        mp3_path = elevenlabs_tts(texto_base, audio_slug)
+
+        # Etapa 2: Transcrever com Whisper
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+        with open(mp3_path, "rb") as f:
+            transcricao = openai.Audio.transcribe("whisper-1", f)
+
+        srt_content = transcricao.get("text", "")
+        if not srt_content:
+            return jsonify({"error": "Transcrição vazia"}), 500
+
+        # Etapa 3: Criar SRT simples
+        frases = [f.strip() for f in srt_content.split(".") if f.strip()]
+        srt_simples = ""
+        tempo_atual = 0
+        for i, frase in enumerate(frases, start=1):
+            inicio = tempo_atual
+            fim = tempo_atual + 4
+            srt_simples += f"{i}\n"
+            srt_simples += f"00:00:{inicio:02},000 --> 00:00:{fim:02},000\n"
+            srt_simples += f"{frase.strip()}.\n\n"
+            tempo_atual += 4
+
+        # Etapa 4: Gerar prompts
+        prompts = gerar_prompts_via_chatgpt(srt_simples, modelo)
+        if not prompts or not prompts[0][1]:
+            return jsonify({"error": "Nenhum prompt gerado"}), 500
+
+        # Etapa 5: Gerar slug com base no primeiro prompt
+        primeiro_prompt = prompts[0][1].split(", ", 1)[1]
+        slug = slugify(primeiro_prompt, 30)
+
+        # Etapa 6: Criar pasta no Drive
+        drive = get_drive_service()
+        pasta_id = criar_subpasta(slug, drive, GOOGLE_DRIVE_ROOT_FOLDER)
+
+        # Etapa 7: Criar CSV
+        csv_path = Path(f"{slug}_prompts.csv")
+        with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(DEFAULT_CSV_HEADER)
+            for _, linha in prompts:
+                prompt_texto = linha.split(", ", 1)[1]
+                writer.writerow(DEFAULT_CSV_ROW(prompt_texto))
+
+        # Etapa 8: Upload dos arquivos
+        upload_para_drive(mp3_path, mp3_path.name, pasta_id, drive)
+        upload_para_drive(csv_path, csv_path.name, pasta_id, drive)
+
         return jsonify({
             "slug": slug,
-            "prompts": [linha.split(", ", 1)[1] for _, linha in prompts]
+            "pasta_drive_id": pasta_id,
+            "arquivos": [mp3_path.name, csv_path.name],
+            "quantidade_prompts": len(prompts)
         })
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
