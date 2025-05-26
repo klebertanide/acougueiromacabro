@@ -228,6 +228,7 @@ def transcrever():
             
 @app.route("/falar", methods=["POST"])
 def falar():
+    import traceback
     try:
         data = request.get_json(force=True)
         texto = data.get("texto")
@@ -238,12 +239,12 @@ def falar():
         slug = slugify(texto[:40])
         audio_bytes = elevenlabs_tts(texto)
 
-        # Salvar localmente (opcional)
+        # Salvar localmente
         audio_path = Path(f"{slug}_audio.mp3")
         with open(audio_path, "wb") as f:
             f.write(audio_bytes)
 
-        # Subir para o Google Drive
+        # Google Drive
         drive = get_drive_service()
         folder_id = criar_subpasta(slug, drive, GOOGLE_DRIVE_ROOT_FOLDER)
         upload_para_drive(audio_path, audio_path.name, folder_id, drive)
@@ -254,10 +255,11 @@ def falar():
             "drive_folder_url": f"https://drive.google.com/drive/folders/{folder_id}"
         })
     except Exception as e:
-        import traceback
+        trace = traceback.format_exc()
+        print("ERRO NO ENDPOINT /falar:\n", trace)
         return jsonify({
-            "error": str(e),
-            "trace": traceback.format_exc()
+            "erro": str(e),
+            "trace": trace
         }), 500
 
 @app.route("/", methods=["GET"])
