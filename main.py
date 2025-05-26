@@ -234,14 +234,10 @@ def falar():
             return jsonify(error="Campo 'texto' é obrigatório"), 400
 
         slug = slugify(texto[:40])
-        audio_bytes = elevenlabs_tts(texto)
+        audio_path = elevenlabs_tts(texto)  # agora retorna o caminho do .mp3 já salvo
+        audio_path = Path(audio_path)
 
-        # Salvar localmente
-        audio_path = Path(f"{slug}_audio.mp3")
-        with open(audio_path, "wb") as f:
-            f.write(audio_bytes)
-
-        # Google Drive
+# Se quiser salvar no Drive:
         drive = get_drive_service()
         folder_id = criar_subpasta(slug, drive, GOOGLE_DRIVE_ROOT_FOLDER)
         upload_para_drive(audio_path, audio_path.name, folder_id, drive)
