@@ -177,6 +177,25 @@ def gerar_prompts_via_chatgpt(srt_content: str, modelo="gpt-4"):
         time.sleep(1.5)
 
     return resultados
+    
+@app.route("/gerar_prompts", methods=["POST"])
+def gerar_prompts_endpoint():
+    data = request.get_json()
+    srt_content = data.get("srt_content", "")
+    modelo = data.get("modelo", "gpt-4")
+
+    if not srt_content:
+        return jsonify({"error": "Conteúdo SRT ausente"}), 400
+
+    try:
+        prompts = gerar_prompts_via_chatgpt(srt_content, modelo)
+        slug = gerar_slug()
+        return jsonify({
+            "slug": slug,
+            "prompts": [linha.split(", ", 1)[1] for _, linha in prompts]
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/", methods=["GET"])
 def index():
