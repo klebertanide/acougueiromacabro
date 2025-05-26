@@ -8,6 +8,8 @@ import json
 import uuid
 import math
 import tempfile
+import openai
+import time
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, request, jsonify
@@ -126,31 +128,60 @@ def parse_ts(ts: str) -> float:
     s, ms = rest.split(",")
     return int(h)*3600 + int(m)*60 + int(s) + int(ms)/1000
 
-def gerar_prompts_dobrados_do_srt(srt_content: str):
-    blocks = []
-    for blk in srt_content.strip().split("\n\n"):
-        parts = blk.strip().split("\n")
-        if len(parts) < 3:
-            continue
-        st, en = parts[1].split(" --> ")
-        txt = " ".join(parts[2:])
-        h, m, s_ms = st.split(":")
-        s, ms = s_ms.split(",")
-        inicio_seg = int(h) * 3600 + int(m) * 60 + int(s) + int(ms) // 1000
-        blocks.append((inicio_seg, txt.strip()))
 
-    prompts = []
-    for i in range(len(blocks)):
-        t1, txt1 = blocks[i]
-        descricao = f"{t1}, {txt1}, horror atmosphere, low lighting, unsettling shadows, digital artifacts, surreal digital painting, cold color palette, glitch aesthetic, paranoia, liminal space, grain, creepy. Nunca inserir texto, frases ou palavras."
-        prompts.append((t1, descricao))
-        if i < len(blocks) - 1:
-            t2, _ = blocks[i + 1]
-            meio = (t1 + t2) // 2
-            descricao_intermediaria = f"{meio}, {txt1}, horror atmosphere, low lighting, unsettling shadows, digital artifacts, surreal digital painting, cold color palette, glitch aesthetic, paranoia, liminal space, grain, creepy. Nunca inserir texto, frases ou palavras."
-            prompts.append((meio, descricao_intermediaria))
 
-    return prompts
+def gerar_prompts_via_chatgpt(srt_content: str, modelo="gpt-4"):
+    def parse_srt(srt: str):
+        blocks = []
+        for blk in srt.strip().split("\n\n"):
+            parts = blk.strip().split("\n")
+            if len(parts) < 3:
+                continue
+            st, en = parts[1].split(" --> ")
+            txt = " ".join(parts[2:])
+            h, m, s_ms = st.split(":")
+            s, ms = s_ms.split(",")
+            inicio_seg = int(h) * 3600 + int(m) * 60 + int(s)
+            blocks.append((inicio_seg, txt.strip()))
+        return blocks
+
+    instrucoes = (
+        "Você receberá um trecho de legenda de vídeo. Para cada trecho, gere um prompt de imagem "
+        "que seja completo, autossuficiente e visual. O prompt deve incluir: o personagem ou entidade envolvida "
+        "(mesmo que implícito), a ação que está ocorrendo, o ambiente onde se passa, e a emoção predominante. "
+        "Finalize o prompt SEM repetir o texto original, mas criando uma descrição nova, visual e cinematográfica. "
+        "Padronize com: 'horror atmosphere, low lighting, unsettling shadows, digital artifacts, surreal digital painting, "
+        "cold color palette, glitch aesthetic, paranoia, liminal space, grain, creepy. Nunca inserir texto, frases ou palavras.'"
+    )
+
+    openai.api_key = os.getenv("OPENAI_API_KEY")
+    blocos = parse_srt(srt_content)
+    resultados = []
+
+    for tempo, legenda in blocos:
+        mensagem = [
+            {"role": "system", "content": instrucoes},
+            {"role": "user", "content": f"Legenda: {legenda}"}
+        ]
+
+        try:
+            resposta = openai.ChatCompletion.create(
+                model=modelo,
+                messages=mensagem,
+                temperature=0.8
+            )
+            prompt = resposta.choices[0].message.content.strip()
+            linha_final = f"{tempo}, {prompt}"
+            resultados.append((tempo, linha_final))
+        except Exception as e:
+            print(f"Erro no tempo {tempo}: {e}")
+            resultados.append((tempo, f"{tempo}, ERRO AO GERAR PROMPT"))
+
+        time.sleep(1.5)  # para evitar throttling
+
+    return resultados
+
+
 
 @app.route("/falar", methods=["POST"])
 def falar():
