@@ -221,7 +221,7 @@ def falar():
             f.write(raw_srt)
         upload_para_drive(srt_path, srt_path.name, folder_id, drive)
 
-        prompts_gerados = gerar_prompts_dobrados_do_srt(raw_srt)
+        prompts_gerados = gerar_prompts_via_chatgpt(raw_srt)
         csv_path = Path(f"{slug}_prompts.csv")
         with open(csv_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
