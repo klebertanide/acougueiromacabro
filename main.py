@@ -2,6 +2,7 @@ import os
 import re
 import csv
 import tempfile
+import traceback
 import requests
 from flask import Flask, request, jsonify
 from datetime import datetime
@@ -10,14 +11,14 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-# Chaves
+# Configuração de chaves e APIs
 openai.api_key = os.getenv("OPENAI_API_KEY")
 ELEVEN_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 SERVICE_ACCOUNT_FILE = "/etc/secrets/service_account.json"
 GOOGLE_DRIVE_ROOT_FOLDER = "1NelNODHVBTbAuVqrfRNmLZP8MVQpF1aX"
 VOICE_ID = "NgBYGKDDq2Z8Hnhatgma"
 
-# Flask App
+# Flask app
 app = Flask(__name__)
 
 # Google Drive
@@ -28,6 +29,8 @@ credentials = service_account.Credentials.from_service_account_file(
 drive_service = build("drive", "v3", credentials=credentials)
 
 FIXED_TAGS = "macabre, scary, terrifying. scribbled. grain. dirty texture. grunge. screen scratches."
+
+# === Funções ===
 
 def gerar_historia(prompt_usuario):
     resposta = openai.chat.completions.create(
@@ -50,7 +53,10 @@ def narrar_com_elevenlabs(texto):
     body = {
         "text": texto,
         "model_id": "eleven_multilingual_v2",
-        "voice_settings": { "stability": 0.4, "similarity_boost": 0.8 }
+        "voice_settings": {
+            "stability": 0.4,
+            "similarity_boost": 0.8
+        }
     }
     response = requests.post(url, headers=headers, json=body)
     if response.status_code == 200:
@@ -141,10 +147,13 @@ def upload_to_drive(filepath, filename, folder_id):
     file_metadata = {"name": filename, "parents": [folder_id]}
     drive_service.files().create(body=file_metadata, media_body=media).execute()
 
+# === Rotas ===
+
 @app.route("/falar", methods=["POST"])
 def falar():
     data = request.get_json()
     prompt = data.get("prompt")
+
     if not prompt:
         return jsonify({"erro": "Envie um prompt no corpo da requisição"}), 400
 
@@ -169,6 +178,8 @@ def falar():
         })
 
     except Exception as e:
+        print("Erro durante execução:")
+        traceback.print_exc()
         return jsonify({"erro": str(e)}), 500
 
 @app.route("/", methods=["GET"])
