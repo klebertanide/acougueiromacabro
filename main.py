@@ -8,18 +8,16 @@ import json
 import uuid
 import math
 import tempfile
-import openai
+import openai  # ← CORRETO AQUI
 import time
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, request, jsonify
-from openai import OpenAI
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 app = Flask(__name__)
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 GOOGLE_DRIVE_ROOT_FOLDER = "1NelNODHVBTbAuVqrfRNmLZP8MVQpF1aX"
 SERVICE_ACCOUNT_FILE     = "/etc/secrets/service_account.json"
 ELEVEN_API_KEY           = os.getenv("ELEVENLABS_API_KEY")
