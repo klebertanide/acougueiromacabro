@@ -88,12 +88,12 @@ def elevenlabs_tts(text: str) -> bytes:
         "Content-Type": "application/json"
     }
 
-    voice_id = "NgBYGKDDq2Z8Hnhatgma"
+    voice_id = "NgBYGKDDq2Z8Hnhatgma"  # Substitua se estiver usando outro voice_id
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream"
 
     payload = {
         "text": text,
-        "model_id": "eleven_turbo_v2_5",
+        "model_id": "eleven_multilingual_v2",
         "voice_settings": {
             "stability": 0.9,
             "similarity_boost": 0.9,
@@ -104,12 +104,22 @@ def elevenlabs_tts(text: str) -> bytes:
 
     for tentativa in range(2):
         try:
+            print(f"Tentativa {tentativa+1}: Enviando requisição para ElevenLabs com modelo multilingual v2")
             r = requests.post(url, headers=headers, json=payload, timeout=600)
             r.raise_for_status()
+            print("Áudio gerado com sucesso.")
             return r.content
+        except requests.exceptions.HTTPError as http_err:
+            print(f"Erro HTTP ({r.status_code}): {r.text}")
+        except requests.exceptions.Timeout:
+            print("Erro: Tempo de requisição excedido.")
+        except requests.exceptions.RequestException as req_err:
+            print(f"Erro de conexão: {req_err}")
         except Exception as e:
-            if tentativa == 1:
-                raise e
+            print(f"Erro inesperado: {e}")
+
+        if tentativa == 1:
+            raise RuntimeError("Erro ao gerar áudio com ElevenLabs usando modelo multilingual_v2.")
 
 def parse_ts(ts: str) -> float:
     h, m, rest = ts.split(":")
