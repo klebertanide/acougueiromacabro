@@ -82,13 +82,18 @@ def slugify(text: str, limit: int = 30) -> str:
     txt = txt.strip().replace(" ", "_").lower()
     return txt[:limit] if txt else gerar_slug()
 
+import tempfile
+
 def elevenlabs_tts(text: str) -> bytes:
+    if not ELEVEN_API_KEY:
+        raise RuntimeError("Variável ELEVEN_API_KEY não definida")
+
     headers = {
         "xi-api-key": ELEVEN_API_KEY,
         "Content-Type": "application/json"
     }
 
-    voice_id = "NgBYGKDDq2Z8Hnhatgma"  # Substitua se estiver usando outro voice_id
+    voice_id = "NgBYGKDDq2Z8Hnhatgma"
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream"
 
     payload = {
@@ -97,30 +102,22 @@ def elevenlabs_tts(text: str) -> bytes:
         "voice_settings": {
             "stability": 0.9,
             "similarity_boost": 0.9,
-            "style": 0.10,
+            "style": 0.1,
             "use_speaker_boost": True
         }
     }
 
-    for tentativa in range(2):
-        try:
-            print(f"Tentativa {tentativa+1}: Enviando requisição para ElevenLabs com modelo multilingual v2")
-            r = requests.post(url, headers=headers, json=payload, timeout=600)
+    try:
+        with requests.post(url, headers=headers, json=payload, stream=True, timeout=120) as r:
             r.raise_for_status()
-            print("Áudio gerado com sucesso.")
-            return r.content
-        except requests.exceptions.HTTPError as http_err:
-            print(f"Erro HTTP ({r.status_code}): {r.text}")
-        except requests.exceptions.Timeout:
-            print("Erro: Tempo de requisição excedido.")
-        except requests.exceptions.RequestException as req_err:
-            print(f"Erro de conexão: {req_err}")
-        except Exception as e:
-            print(f"Erro inesperado: {e}")
-
-        if tentativa == 1:
-            raise RuntimeError("Erro ao gerar áudio com ElevenLabs usando modelo multilingual_v2.")
-
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_audio:
+                for chunk in r.iter_content(chunk_size=8192):
+                    if chunk:
+                        temp_audio.write(chunk)
+                return temp_audio.name  # retorna o caminho do arquivo temporário salvo
+    except requests.RequestException as e:
+        raise RuntimeError(f"Erro ao chamar ElevenLabs: {e}")
+        
 def parse_ts(ts: str) -> float:
     h, m, rest = ts.split(":")
     s, ms = rest.split(",")
