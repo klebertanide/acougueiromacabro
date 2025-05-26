@@ -14,7 +14,6 @@ from flask import Flask, request, jsonify
 from openai import OpenAI
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
 
 app = Flask(__name__)
@@ -75,7 +74,7 @@ def criar_subpasta(nome: str, drive, parent_folder_id: str):
         raise RuntimeError("Falha ao criar subpasta no Google Drive.")
 
 def upload_para_drive(path: Path, nome: str, folder_id: str, drive):
-    media = MediaFileUpload(str(path))  # mantém resumable padrão
+    media = MediaFileUpload(str(path))
     drive.files().create(body={"name": nome, "parents": [folder_id]}, media_body=media).execute()
 
 def gerar_slug():
@@ -152,77 +151,6 @@ def gerar_prompts_dobrados_do_srt(srt_content: str):
 
     return prompts
 
-@app.route("/transcrever", methods=["POST"])
-def transcrever():
-    data = request.get_json(force=True) or {}
-    audio_ref = data.get("audio_url") or data.get("audio_file")
-    slug = data.get("slug")
-
-    if not audio_ref:
-        return jsonify(error="campo 'audio_url' ou 'audio_file' obrigatório"), 400
-
-    if not slug:
-        slug = Path(audio_ref).stem
-        if "_audio" in slug:
-            slug = slug.replace("_audio", "")
-
-    try:
-        if os.path.exists(audio_ref):
-            fobj = open(audio_ref, "rb")
-        else:
-            resp = requests.get(audio_ref, timeout=60)
-            resp.raise_for_status()
-            fobj = io.BytesIO(resp.content)
-            fobj.name = Path(audio_ref).name or "audio.mp3"
-    except Exception as e:
-        return jsonify(error="falha ao carregar áudio", detalhe=str(e)), 400
-
-    try:
-        raw_srt = client.audio.transcriptions.create(model="whisper-1", file=fobj, response_format="srt")
-        blocks = []
-        for blk in raw_srt.strip().split("\n\n"):
-            parts = blk.split("\n")
-            if len(parts) < 3:
-                continue
-            st, en = parts[1].split(" --> ")
-            txt = " ".join(parts[2:])
-            inicio = parse_ts(st)
-            fim = parse_ts(en)
-            blocks.append((inicio, fim, txt))
-        total = blocks[-1][1] if blocks else 0
-
-        srt_path = Path(f"{slug}_legenda.srt")
-        with open(srt_path, "w", encoding="utf-8") as f:
-            f.write(raw_srt)
-
-        drive = get_drive_service()
-        folder_id = criar_subpasta(slug, drive, GOOGLE_DRIVE_ROOT_FOLDER)
-        upload_para_drive(srt_path, srt_path.name, folder_id, drive)
-
-        prompts_gerados = gerar_prompts_dobrados_do_srt(raw_srt)
-
-        csv_path = Path(f"{slug}_prompts.csv")
-        with open(csv_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(DEFAULT_CSV_HEADER)
-            for _, prompt in prompts_gerados:
-                writer.writerow(DEFAULT_CSV_ROW(prompt))
-
-        upload_para_drive(csv_path, csv_path.name, folder_id, drive)
-
-        return jsonify(
-            transcricao=[{"inicio": i, "fim": f, "texto": t} for i, f, t in blocks],
-            duracao_total=total,
-            slug=slug,
-            prompts=prompts_gerados,
-            folder_url=f"https://drive.google.com/drive/folders/{folder_id}"
-        )
-    except Exception as e:
-        return jsonify(error="falha na transcrição", detalhe=str(e)), 500
-    finally:
-        try: fobj.close()
-        except: pass
-
 @app.route("/falar", methods=["POST"])
 def falar():
     import traceback
@@ -241,10 +169,41 @@ def falar():
         folder_id = criar_subpasta(slug, drive, GOOGLE_DRIVE_ROOT_FOLDER)
         upload_para_drive(audio_path, audio_path.name, folder_id, drive)
 
+        with open(audio_path, "rb") as fobj:
+            raw_srt = client.audio.transcriptions.create(model="whisper-1", file=fobj, response_format="srt")
+
+        blocks = []
+        for blk in raw_srt.strip().split("\n\n"):
+            parts = blk.split("\n")
+            if len(parts) < 3:
+                continue
+            st, en = parts[1].split(" --> ")
+            txt = " ".join(parts[2:])
+            inicio = parse_ts(st)
+            fim = parse_ts(en)
+            blocks.append((inicio, fim, txt))
+        total = blocks[-1][1] if blocks else 0
+
+        srt_path = Path(f"{slug}_legenda.srt")
+        with open(srt_path, "w", encoding="utf-8") as f:
+            f.write(raw_srt)
+        upload_para_drive(srt_path, srt_path.name, folder_id, drive)
+
+        prompts_gerados = gerar_prompts_dobrados_do_srt(raw_srt)
+        csv_path = Path(f"{slug}_prompts.csv")
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(DEFAULT_CSV_HEADER)
+            for _, prompt in prompts_gerados:
+                writer.writerow(DEFAULT_CSV_ROW(prompt))
+        upload_para_drive(csv_path, csv_path.name, folder_id, drive)
+
         return jsonify({
-            "audio_url": f"https://drive.google.com/drive/folders/{folder_id}",
             "slug": slug,
-            "drive_folder_url": f"https://drive.google.com/drive/folders/{folder_id}"
+            "duracao_total": total,
+            "folder_url": f"https://drive.google.com/drive/folders/{folder_id}",
+            "transcricao": [dict(inicio=i, fim=f, texto=t) for i, f, t in blocks],
+            "prompts": prompts_gerados
         })
 
     except Exception as e:
