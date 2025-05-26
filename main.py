@@ -225,6 +225,40 @@ def transcrever():
     finally:
         try: fobj.close()
         except: pass
+            
+@app.route("/falar", methods=["POST"])
+def falar():
+    try:
+        data = request.get_json(force=True)
+        texto = data.get("texto")
+
+        if not texto:
+            return jsonify(error="Campo 'texto' é obrigatório"), 400
+
+        slug = slugify(texto[:40])
+        audio_bytes = elevenlabs_tts(texto)
+
+        # Salvar localmente (opcional)
+        audio_path = Path(f"{slug}_audio.mp3")
+        with open(audio_path, "wb") as f:
+            f.write(audio_bytes)
+
+        # Subir para o Google Drive
+        drive = get_drive_service()
+        folder_id = criar_subpasta(slug, drive, GOOGLE_DRIVE_ROOT_FOLDER)
+        upload_para_drive(audio_path, audio_path.name, folder_id, drive)
+
+        return jsonify({
+            "audio_url": f"https://drive.google.com/drive/folders/{folder_id}",
+            "slug": slug,
+            "drive_folder_url": f"https://drive.google.com/drive/folders/{folder_id}"
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            "error": str(e),
+            "trace": traceback.format_exc()
+        }), 500
 
 @app.route("/", methods=["GET"])
 def index():
