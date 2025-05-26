@@ -16,7 +16,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 ELEVEN_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 SERVICE_ACCOUNT_FILE = "/etc/secrets/service_account.json"
 GOOGLE_DRIVE_ROOT_FOLDER = "1NelNODHVBTbAuVqrfRNmLZP8MVQpF1aX"
-VOICE_ID = "NgBYGKDDq2Z8Hnhatgma"
+VOICE_ID = "NgBYGKDDq2Z8Hnhatgma"  # Atlas
 
 # Flask app
 app = Flask(__name__)
@@ -53,19 +53,26 @@ def narrar_com_elevenlabs(texto):
     body = {
         "text": texto,
         "model_id": "eleven_multilingual_v2",
+        "voice_id": VOICE_ID,
         "voice_settings": {
             "stability": 0.4,
             "similarity_boost": 0.8
         }
     }
-    response = requests.post(url, headers=headers, json=body)
-    if response.status_code == 200:
+
+    try:
+        response = requests.post(url, headers=headers, json=body, timeout=30)
+        response.raise_for_status()
+
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
         tmp.write(response.content)
         tmp.close()
         return tmp.name
-    else:
-        raise Exception(f"Erro ElevenLabs: {response.status_code} - {response.text}")
+
+    except Exception as e:
+        print("Erro ElevenLabs:", e)
+        print("Resposta:", response.text if 'response' in locals() else 'Nenhuma')
+        raise Exception("Falha na chamada da ElevenLabs")
 
 def transcrever_whisper(mp3_path):
     with open(mp3_path, "rb") as f:
