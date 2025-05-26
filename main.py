@@ -7,6 +7,7 @@ import unidecode
 import json
 import uuid
 import math
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, request, jsonify
@@ -82,11 +83,9 @@ def slugify(text: str, limit: int = 30) -> str:
     txt = txt.strip().replace(" ", "_").lower()
     return txt[:limit] if txt else gerar_slug()
 
-import tempfile
-
-def elevenlabs_tts(text: str) -> bytes:
+def elevenlabs_tts(text: str) -> str:
     if not ELEVEN_API_KEY:
-        raise RuntimeError("Variável ELEVEN_API_KEY não definida")
+        raise RuntimeError("VariÃ¡vel ELEVEN_API_KEY nÃ£o definida")
 
     headers = {
         "xi-api-key": ELEVEN_API_KEY,
@@ -114,16 +113,14 @@ def elevenlabs_tts(text: str) -> bytes:
                 for chunk in r.iter_content(chunk_size=8192):
                     if chunk:
                         temp_audio.write(chunk)
-                return temp_audio.name  # retorna o caminho do arquivo temporário salvo
+                return temp_audio.name
     except requests.RequestException as e:
         raise RuntimeError(f"Erro ao chamar ElevenLabs: {e}")
-        
+
 def parse_ts(ts: str) -> float:
     h, m, rest = ts.split(":")
     s, ms = rest.split(",")
     return int(h)*3600 + int(m)*60 + int(s) + int(ms)/1000
-
-# Função auxiliar para gerar prompts duplicados
 
 def gerar_prompts_dobrados_do_srt(srt_content: str):
     blocks = []
@@ -158,7 +155,7 @@ def transcrever():
     slug = data.get("slug")
 
     if not audio_ref:
-        return jsonify(error="campo 'audio_url' ou 'audio_file' obrigatório"), 400
+        return jsonify(error="campo 'audio_url' ou 'audio_file' obrigatÃ³rio"), 400
 
     if not slug:
         slug = Path(audio_ref).stem
@@ -174,7 +171,7 @@ def transcrever():
             fobj = io.BytesIO(resp.content)
             fobj.name = Path(audio_ref).name or "audio.mp3"
     except Exception as e:
-        return jsonify(error="falha ao carregar áudio", detalhe=str(e)), 400
+        return jsonify(error="falha ao carregar Ã¡udio", detalhe=str(e)), 400
 
     try:
         raw_srt = client.audio.transcriptions.create(model="whisper-1", file=fobj, response_format="srt")
@@ -200,7 +197,6 @@ def transcrever():
 
         prompts_gerados = gerar_prompts_dobrados_do_srt(raw_srt)
 
-        # Gerar CSV
         csv_path = Path(f"{slug}_prompts.csv")
         with open(csv_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
@@ -218,11 +214,11 @@ def transcrever():
             folder_url=f"https://drive.google.com/drive/folders/{folder_id}"
         )
     except Exception as e:
-        return jsonify(error="falha na transcrição", detalhe=str(e)), 500
+        return jsonify(error="falha na transcriÃ§Ã£o", detalhe=str(e)), 500
     finally:
         try: fobj.close()
         except: pass
-            
+
 @app.route("/falar", methods=["POST"])
 def falar():
     import traceback
@@ -231,13 +227,12 @@ def falar():
         texto = data.get("texto")
 
         if not texto:
-            return jsonify(error="Campo 'texto' é obrigatório"), 400
+            return jsonify(error="Campo 'texto' Ã© obrigatÃ³rio"), 400
 
         slug = slugify(texto[:40])
-        audio_path = elevenlabs_tts(texto)  # agora retorna o caminho do .mp3 já salvo
-        audio_path = Path(audio_path)
+        audio_path_str = elevenlabs_tts(texto)
+        audio_path = Path(audio_path_str)
 
-# Se quiser salvar no Drive:
         drive = get_drive_service()
         folder_id = criar_subpasta(slug, drive, GOOGLE_DRIVE_ROOT_FOLDER)
         upload_para_drive(audio_path, audio_path.name, folder_id, drive)
@@ -247,6 +242,7 @@ def falar():
             "slug": slug,
             "drive_folder_url": f"https://drive.google.com/drive/folders/{folder_id}"
         })
+
     except Exception as e:
         trace = traceback.format_exc()
         print("ERRO NO ENDPOINT /falar:\n", trace)
@@ -257,9 +253,8 @@ def falar():
 
 @app.route("/", methods=["GET"])
 def index():
-    return "Servidor do Açougueiro Macabro está online e rodando."
+    return "Servidor do AÃ§ougueiro Macabro estÃ¡ online e rodando."
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
