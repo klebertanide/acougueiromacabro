@@ -86,7 +86,7 @@ def slugify(text: str, limit: int = 30) -> str:
     txt = txt.strip().replace(" ", "_").lower()
     return txt[:limit] if txt else gerar_slug()
 
-def elevenlabs_tts(text: str) -> str:
+def elevenlabs_tts(text: str, slug: str) -> str:
     if not ELEVEN_API_KEY:
         raise RuntimeError("Variável ELEVEN_API_KEY não definida")
 
@@ -112,11 +112,12 @@ def elevenlabs_tts(text: str) -> str:
     try:
         with requests.post(url, headers=headers, json=payload, stream=True, timeout=120) as r:
             r.raise_for_status()
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_audio:
+            mp3_path = Path(f"{slug}_audio.mp3")
+            with open(mp3_path, "wb") as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     if chunk:
-                        temp_audio.write(chunk)
-                return temp_audio.name
+                        f.write(chunk)
+            return str(mp3_path)
     except requests.RequestException as e:
         raise RuntimeError(f"Erro ao chamar ElevenLabs: {e}")
 
@@ -162,7 +163,7 @@ def falar():
             return jsonify(error="Campo 'texto' é obrigatório"), 400
 
         slug = slugify(texto[:40])
-        audio_path_str = elevenlabs_tts(texto)
+        audio_path_str = elevenlabs_tts(texto, slug)
         audio_path = Path(audio_path_str)
 
         drive = get_drive_service()
