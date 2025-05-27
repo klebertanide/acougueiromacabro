@@ -144,7 +144,11 @@ def gerar_csv_prompts(srt_path):
 
     with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(["second", "prompt"])
+        writer.writerow([
+            "Prompt", "Visibility", "Aspect_ratio", "Magic_prompt", "Model",
+            "Seed_number", "Rendering", "Negative_prompt", "Style",
+            "color_palette", "Num_images"
+        ])
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = {
@@ -152,12 +156,16 @@ def gerar_csv_prompts(srt_path):
                 for segundos, texto in segmentos
             }
             for future in as_completed(futures):
-                segundos = futures[future]
                 try:
                     prompt = future.result(timeout=30)
                 except FuturesTimeoutError:
                     prompt = "Timeout ao gerar prompt"
-                writer.writerow([segundos, prompt])
+
+                writer.writerow([
+                    prompt, "private", "9:16", "on", "3", "",
+                    "turbo", "sem palavras, sem frases, sem textos, palavras, textos, frases, words, sentences, texts, paragraphs, letters, captions, watermark, logos",
+                    "design", "", "4"
+                ])
 
     return csv_path
 
@@ -183,8 +191,6 @@ def upload_to_drive(filepath, filename, folder_id):
     file_metadata = {"name": filename, "parents": [folder_id]}
     file = drive_service.files().create(body=file_metadata, media_body=media, fields="id, webViewLink").execute()
     return file["webViewLink"]
-
-# === Rotas ===
 
 @app.route("/falar", methods=["POST"])
 def falar():
