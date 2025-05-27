@@ -146,7 +146,7 @@ def gerar_csv_prompts(srt_path):
         writer = csv.writer(csvfile)
         writer.writerow(["second", "prompt"])
 
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        with ThreadPoolExecutor(max_workers=2) as executor:
             futures = {
                 executor.submit(gerar_prompt_seguro, segundos, texto): segundos
                 for segundos, texto in segmentos
