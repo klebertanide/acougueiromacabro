@@ -18,6 +18,9 @@ SERVICE_ACCOUNT_FILE = "/etc/secrets/service_account.json"
 GOOGLE_DRIVE_ROOT_FOLDER = "1NelNODHVBTbAuVqrfRNmLZP8MVQpF1aX"
 VOICE_ID = "NgBYGKDDq2Z8Hnhatgma"  # Atlas
 
+if not ELEVEN_API_KEY:
+    raise ValueError("ELEVENLABS_API_KEY não definida!")
+
 # Flask app
 app = Flask(__name__)
 
@@ -63,15 +66,19 @@ def narrar_com_elevenlabs(texto):
     try:
         response = requests.post(url, headers=headers, json=body, timeout=90)
         response.raise_for_status()
-
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
         tmp.write(response.content)
         tmp.close()
         return tmp.name
-
     except Exception as e:
         print("Erro ElevenLabs:", e)
-        print("Resposta:", response.text if 'response' in locals() else 'Nenhuma')
+        if 'response' in locals():
+            try:
+                print("Resposta:", response.text)
+            except:
+                print("Resposta inválida")
+        else:
+            print("Resposta: Nenhuma")
         raise Exception("Falha na chamada da ElevenLabs")
 
 def transcrever_whisper(mp3_path):
@@ -187,6 +194,15 @@ def falar():
     except Exception as e:
         print("Erro durante execução:")
         traceback.print_exc()
+        return jsonify({"erro": str(e)}), 500
+
+@app.route("/teste-elevenlabs", methods=["GET"])
+def teste_elevenlabs():
+    texto = "Este é um teste da voz macabra de ElevenLabs."
+    try:
+        mp3_path = narrar_com_elevenlabs(texto)
+        return jsonify({"mensagem": "Narração concluída.", "arquivo": mp3_path})
+    except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
 @app.route("/", methods=["GET"])
