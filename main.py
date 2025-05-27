@@ -10,6 +10,7 @@ import openai
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
 
 # Configuração de chaves e APIs
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -133,12 +134,31 @@ def gerar_csv_prompts(srt_path):
     print("[DEBUG] Gerando prompts...")
     segmentos = parse_srt(srt_path)
     csv_path = srt_path.replace(".srt", ".csv")
+
+    def gerar_prompt_seguro(segundos, texto):
+        try:
+            return gerar_prompt_imagem(texto, segundos)
+        except Exception as e:
+            print(f"Erro ao gerar prompt para {segundos}s: {e}")
+            return "Erro ao gerar prompt"
+
     with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(["second", "prompt"])
-        for segundos, texto in segmentos:
-            prompt = gerar_prompt_imagem(texto, segundos)
-            writer.writerow([segundos, prompt])
+
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = {
+                executor.submit(gerar_prompt_seguro, segundos, texto): segundos
+                for segundos, texto in segmentos
+            }
+            for future in as_completed(futures):
+                segundos = futures[future]
+                try:
+                    prompt = future.result(timeout=30)
+                except FuturesTimeoutError:
+                    prompt = "Timeout ao gerar prompt"
+                writer.writerow([segundos, prompt])
+
     return csv_path
 
 def salvar_txt(texto, slug):
