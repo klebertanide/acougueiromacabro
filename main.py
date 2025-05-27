@@ -61,7 +61,7 @@ def narrar_com_elevenlabs(texto):
     }
 
     try:
-        response = requests.post(url, headers=headers, json=body, timeout=30)
+        response = requests.post(url, headers=headers, json=body, timeout=90)
         response.raise_for_status()
 
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
