@@ -33,6 +33,7 @@ FIXED_TAGS = "macabre, scary, terrifying. scribbled. grain. dirty texture. grung
 # === Funções ===
 
 def gerar_historia(prompt_usuario):
+    print("[DEBUG] Gerando história...")
     resposta = openai.chat.completions.create(
         model="gpt-4",
         messages=[
@@ -45,6 +46,7 @@ def gerar_historia(prompt_usuario):
     return resposta.choices[0].message.content.strip()
 
 def narrar_com_elevenlabs(texto):
+    print("[DEBUG] Gerando áudio...")
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}"
     headers = {
         "xi-api-key": ELEVEN_API_KEY,
@@ -78,6 +80,7 @@ def narrar_com_elevenlabs(texto):
         raise Exception("Falha na chamada da ElevenLabs")
 
 def transcrever_whisper(mp3_path):
+    print("[DEBUG] Transcrevendo áudio...")
     with open(mp3_path, "rb") as f:
         transcript = openai.audio.transcriptions.create(
             model="whisper-1",
@@ -127,6 +130,7 @@ Start the output with \"{segundos},\" and end with:
     return resp.choices[0].message.content.strip()
 
 def gerar_csv_prompts(srt_path):
+    print("[DEBUG] Gerando prompts...")
     segmentos = parse_srt(srt_path)
     csv_path = srt_path.replace(".srt", ".csv")
     with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
@@ -138,6 +142,7 @@ def gerar_csv_prompts(srt_path):
     return csv_path
 
 def salvar_txt(texto, slug):
+    print("[DEBUG] Salvando texto...")
     path = os.path.join(tempfile.gettempdir(), f"{slug}.txt")
     with open(path, "w", encoding="utf-8") as f:
         f.write(texto)
@@ -153,6 +158,7 @@ def create_drive_folder(name, parent_id):
     return folder.get("id")
 
 def upload_to_drive(filepath, filename, folder_id):
+    print(f"[DEBUG] Enviando {filename} para o Google Drive...")
     media = MediaFileUpload(filepath, resumable=True)
     file_metadata = {"name": filename, "parents": [folder_id]}
     file = drive_service.files().create(body=file_metadata, media_body=media, fields="id, webViewLink").execute()
@@ -177,7 +183,9 @@ def falar():
         csv_path = gerar_csv_prompts(srt_path)
         txt_path = salvar_txt(historia, slug)
 
+        print("[DEBUG] Criando pasta no Google Drive...")
         folder_id = create_drive_folder(slug, GOOGLE_DRIVE_ROOT_FOLDER)
+
         mp3_link = upload_to_drive(mp3_path, f"{slug}.mp3", folder_id)
         srt_link = upload_to_drive(srt_path, f"{slug}.srt", folder_id)
         csv_link = upload_to_drive(csv_path, f"{slug}.csv", folder_id)
